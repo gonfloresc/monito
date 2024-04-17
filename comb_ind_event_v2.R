@@ -58,7 +58,6 @@ lapply(files, eliminar_deleteflag)
 ###### importar y combinar los .csv en uno solo "csv_database"
 
 csv_database <- data.frame()
-#data1 <- data.frame()
 
 extract_house_number <- function(casa) {
   # Buscar el número de casa en el texto usando expresiones regulares
@@ -90,7 +89,7 @@ for (file in files) {
 
 ## creacion db_event database
 
-# Estructura Datos. Agregar columnas "evento total" "evento casa" "casa"
+# Estructura Datos. Agregar columnas "evento total" "evento casa"
 db_event <- data.frame()
 db_event <- csv_database
 ev_total <- seq_len(nrow(db_event))
@@ -100,6 +99,43 @@ db_event <- cbind(Evento_total = ev_total, Evento_casa = ev_casa, Casa = csv_dat
 # Eliminar la última columna
 db_event <- subset(db_event, select = -ncol(db_event))
 
+###
+###   Filtrar db_evento por periodo de tiempo. Aqui establecer tiempo
+
+db_event_flt_date <- db_event %>% 
+  mutate(DateTime = as.POSIXct(DateTime, format = "%Y-%m-%d %H:%M:%S")) %>% 
+  filter(DateTime >= as.POSIXct("2022-05-01") & DateTime <= as.POSIXct("2022-07-31"))
+
+
+###   Filtrar por evento unico
+# orden por casa y DateTime
+db_event_flt_ind <- db_event_flt_date %>% arrange(Casa, DateTime, Especie1)
+
+db_event_flt_ind_nuevo <- data.frame()
+
+# Calcular la diferencia de tiempo dentro de cada grupo de "Casa"
+for (i in 1:nrow(db_event_flt_ind)) {
+  if (i == 1 || db_event_flt_ind$Casa[i] != db_event_flt_ind$Casa[i-1]) {
+    db_event_flt_ind_nuevo[i] <- db_event_flt_ind[i]
+  } else if (is.na(db_event_flt_ind$Especie1[i - 1]) || db_event_flt_ind$Especie1[i] != db_event_flt_ind$Especie1[i-1]) {
+    db_event_flt_ind_nuevo[i] <- db_event_flt_ind[i]
+  } else if (difftime(DateTime[i], lag(DateTime[i-1]), units = "hours") >= 1){
+    db_event_flt_ind_nuevo[i] <- db_event_flt_ind[i]
+  }
+}
+
+
+
+
+
+for (casa in unique(db_event_flt_ind)) {
+  for (i in seq_along(nrow(db_event_flt_ind))) {
+    if ()
+  }
+}
+
+# Crear un nuevo dataframe con el nombre de la columna "Especie1"
+nuevo_dataframe <- data.frame(Especie1 = filas_true$Casa, DateTime = filas_true$DateTime)
 
 
 
@@ -107,11 +143,7 @@ db_event <- subset(db_event, select = -ncol(db_event))
 
 
 
-
-
-
-
-
+#########################
 
 ##  Asignar nombre casa a columna $Casa
 extract_house_number <- function(casa) {
@@ -120,22 +152,6 @@ extract_house_number <- function(casa) {
   # Convertir a número entero
   as.integer(house)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #######################
 #Asignar nombre casa a columna $Casa
