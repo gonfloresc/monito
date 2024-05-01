@@ -5,7 +5,7 @@ library(stringi)
 
 #  crea una lista de los .csv a importar
 ## !! modificar aqui la ruta donde se encuentran los archivos
-files <- list.files(path = "test_csv/csv originales/v2024_04_18/2022/", pattern = "*.csv", full.names = TRUE)
+files <- list.files(path = "csv_revisiones/v2024_04_29/2023/", pattern = "*.csv", full.names = TRUE)
 
 ### Eliminar columna $DeleteFlag en archivos .csv y equipara el numero de columnas
 
@@ -99,6 +99,11 @@ db_event <- cbind(Evento_total = ev_total, Evento_casa = ev_casa, Casa = csv_dat
 # Eliminar la última columna
 db_event <- subset(db_event, select = -ncol(db_event))
 
+## Extraer Total Casas
+
+tota_casas <- unique(db_event$Casa)
+write.csv(tota_casas, "Resultados/Casas_totales_2023.csv", row.names = FALSE)
+
 #extraer simbolos y letras de temperatura
 for (i in seq_len(nrow(db_event))) {
   temp_str <- db_event$Temperatura[i]
@@ -107,11 +112,12 @@ for (i in seq_len(nrow(db_event))) {
 
 
 ###
-###   Filtrar db_evento por periodo de tiempo. Aqui establecer tiempo
+###   Filtrar db_event por periodo de tiempo. 
 
 db_event_flt_date <- db_event %>% 
   mutate(DateTime = as.POSIXct(DateTime, format = "%Y-%m-%d %H:%M:%S")) %>% 
-  filter(DateTime >= as.POSIXct("2022-06-21") & DateTime <= as.POSIXct("2022-09-21"))
+  filter(DateTime >= as.POSIXct("2023-06-21") & DateTime <= as.POSIXct("2023-09-21")) ## Aqui establecer periodo
+
 
 
 ###   Filtrar evento unico x spp
@@ -134,6 +140,7 @@ lista_spp_uni <- list()
 evento <- numeric()
 df <- data.frame()
 df_nuevo <- data.frame()
+ult_casa <- NA
 
 # Revisión evento independiente por spp
 for (i in seq_along(lista_spp)) {
@@ -164,7 +171,7 @@ for (i in seq_along(lista_spp)) {
       # Calcular la diferencia de tiempo entre la fila 1 y evento
       diferencia_tiempo <- difftime(df$DateTime[j], evento, units = "mins")
       diferencia_tiempo <- as.numeric(diferencia_tiempo)
-      if (diferencia_tiempo >= 60) {
+      if (diferencia_tiempo >= 60) {        ###### <----Aqui establecer rango evento único (mins)
         df_nuevo <- rbind(df_nuevo, df[j,])
         evento <- df$DateTime[j]
         ult_casa <- df$Casa[j]
@@ -173,7 +180,7 @@ for (i in seq_along(lista_spp)) {
   }
   lista_spp_uni[[df_name]] <- df_nuevo
   ult_casa <- NA
-  write.csv(lista_spp_uni[[df_name]], file = paste0("Resultados/Eventos_unicos_spp/2022/", df_name, ".csv"), row.names = FALSE)
+  write.csv(lista_spp_uni[[df_name]], file = paste0("Resultados/Eventos_unicos_spp/2023/", df_name, ".csv"), row.names = FALSE)
 }
 
 ### Creacion output.csv con resumen 
