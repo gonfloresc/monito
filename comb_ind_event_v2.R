@@ -7,7 +7,7 @@ library(stringi)
 ## !! modificar aqui la ruta donde se encuentran los archivos
 files <- list.files(path = "csv_revisiones/v2024_04_29/2023/", pattern = "*.csv", full.names = TRUE)
 
-### Eliminar columna $DeleteFlag en archivos .csv y equipara el numero de columnas
+### Eliminar columna $DeleteFlag y equipara el numero de columnas en archivos .csv
 
 eliminar_deleteflag <- function(file_path) {
   # Leer el archivo CSV con delimitador ","
@@ -76,7 +76,7 @@ casa <- seq_len(nrow(csv_database))
 
 for (file in files) {
   house_number <- extract_house_number(file)
-  house_name <- paste("Casa", house_number, sep = "")
+  house_name <- paste("casa", house_number, sep = "")
   
   datos_temporales <- read_delim(file, delim = ",", locale = locale(decimal_mark = ",", grouping_mark = "."))
   datos_temporales$Casa <- house_name
@@ -100,9 +100,11 @@ db_event <- cbind(Evento_total = ev_total, Evento_casa = ev_casa, Casa = csv_dat
 db_event <- subset(db_event, select = -ncol(db_event))
 
 ## Extraer Total Casas
-
-tota_casas <- unique(db_event$Casa)
-write.csv(tota_casas, "Resultados/Casas_totales_2023.csv", row.names = FALSE)
+total_casas <- unique(db_event$Casa)
+numeros <- as.numeric(gsub("casa", "", total_casas))
+indice_orden <- order(numeros)
+total_casas <- total_casas[indice_orden]
+write.csv(total_casas, "Resultados/Casas_totales_2023.csv", row.names = FALSE)
 
 #extraer simbolos y letras de temperatura
 for (i in seq_len(nrow(db_event))) {
@@ -113,16 +115,15 @@ for (i in seq_len(nrow(db_event))) {
 
 ###
 ###   Filtrar db_event por periodo de tiempo. 
-
 db_event_flt_date <- db_event %>% 
   mutate(DateTime = as.POSIXct(DateTime, format = "%Y-%m-%d %H:%M:%S")) %>% 
-  filter(DateTime >= as.POSIXct("2023-06-21") & DateTime <= as.POSIXct("2023-09-21")) ## Aqui establecer periodo
-
+  filter(DateTime >= as.POSIXct("2023-05-05") & DateTime <= as.POSIXct("2023-09-21")) ## Aqui establecer periodo
 
 
 ###   Filtrar evento unico x spp
-# Obtener todos los valores únicos de especie
+# Obtener todos los valores únicos de especie (y limpieza spp gato guiña a gato guina)
 especies_unicas <- unique(db_event_flt_date$Especie1)
+especies_unicas <- stri_replace_all_fixed(especies_unicas, "gato gui\xf1a", "gato guina")
 
 # Crear una lista para almacenar los dataframes separados por especie
 lista_spp <- list()
@@ -141,6 +142,10 @@ evento <- numeric()
 df <- data.frame()
 df_nuevo <- data.frame()
 ult_casa <- NA
+conteo_eventos <- 1
+conteo_eventos_casa <- 1
+
+## IMPORTANTE revisar lista_spp y eliminar manualmente dataframes vacios usar lista_spp[[indice_df_vacio]] <- NULL
 
 # Revisión evento independiente por spp
 for (i in seq_along(lista_spp)) {
@@ -160,14 +165,21 @@ for (i in seq_along(lista_spp)) {
         df_nuevo[j,] <- df[j,]
         evento <- df$DateTime[j]
         ult_casa <- df$Casa[j]
+        
+        df_nuevo$Evento_casa[conteo_eventos] <- conteo_eventos_casa
+        conteo_eventos_casa <- conteo_eventos_casa + 1
+        conteo_eventos <- conteo_eventos + 1
       } 
       if (j == 1 && casa != ult_casa) {
         df_nuevo <- rbind(df_nuevo, df[j,])
         evento <- df$DateTime[j]
         ult_casa <- df$Casa[j]
+        
+        df_nuevo$Evento_casa[conteo_eventos] <- conteo_eventos_casa
+        conteo_eventos_casa <- conteo_eventos_casa + 1
+        conteo_eventos <- conteo_eventos + 1
       }
       df$DateTime <- as.POSIXct(df$DateTime)
-      #diferencia_tiempo <- numeric()
       # Calcular la diferencia de tiempo entre la fila 1 y evento
       diferencia_tiempo <- difftime(df$DateTime[j], evento, units = "mins")
       diferencia_tiempo <- as.numeric(diferencia_tiempo)
@@ -175,205 +187,23 @@ for (i in seq_along(lista_spp)) {
         df_nuevo <- rbind(df_nuevo, df[j,])
         evento <- df$DateTime[j]
         ult_casa <- df$Casa[j]
+        
+        df_nuevo$Evento_casa[conteo_eventos] <- conteo_eventos_casa
+        conteo_eventos_casa <- conteo_eventos_casa + 1
+        conteo_eventos <- conteo_eventos + 1
       }
     }
+    conteo_eventos_casa <- 1
+    
   }
+  df_nuevo$Evento_total <- 1:nrow(df_nuevo)
+  conteo_eventos <- 1
+  conteo_eventos_casa <- 1
+  
   lista_spp_uni[[df_name]] <- df_nuevo
   ult_casa <- NA
   write.csv(lista_spp_uni[[df_name]], file = paste0("Resultados/Eventos_unicos_spp/2023/", df_name, ".csv"), row.names = FALSE)
 }
 
 ### Creacion output.csv con resumen 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#################
-# Funcion evento unico
-filtrar_por_tiempo <- function(df) {
-  # Ordenar el dataframe por la columna DateTime para asegurar que esté ordenado cronológicamente
-  df <- df[order(df$DateTime), ]
-  
-  # Calcular la diferencia de tiempo en horas entre cada fila y la fila anterior
-  diferencia_tiempo <- difftime(df$DateTime, lag(df$DateTime), units = "hours")
-  
-  # Filtrar las filas donde la diferencia de tiempo es mayor a 1 hora
-  df_filtrado <- df[diferencia_tiempo > 1, ]
-  
-  return(df_filtrado)
-}
-#################
-
-
-#######################
-db_event_flt_ind <- db_event_flt_date %>% arrange(Casa, DateTime, Especie1)
-
-db_event_flt_ind_nuevo <- data.frame()
-
-# Calcular la diferencia de tiempo dentro de cada grupo de "Casa"
-for (i in 1:nrow(db_event_flt_ind)) {
-  if (i == 1 || db_event_flt_ind$Casa[i] != db_event_flt_ind$Casa[i-1]) {
-    db_event_flt_ind_nuevo[i] <- db_event_flt_ind[i]
-  } else if (is.na(db_event_flt_ind$Especie1[i - 1]) || db_event_flt_ind$Especie1[i] != db_event_flt_ind$Especie1[i-1]) {
-    db_event_flt_ind_nuevo[i] <- db_event_flt_ind[i]
-  } else if (difftime(DateTime[i], lag(DateTime[i-1]), units = "hours") >= 1){
-    db_event_flt_ind_nuevo[i] <- db_event_flt_ind[i]
-  }
-}
-
-for (casa in unique(db_event_flt_ind)) {
-  for (i in seq_along(nrow(db_event_flt_ind))) {
-
-  }
-}
-
-# Crear un nuevo dataframe con el nombre de la columna "Especie1"
-nuevo_dataframe <- data.frame(Especie1 = filas_true$Casa, DateTime = filas_true$DateTime)
-
-
-
-
-
-
-
-
-
-
-
-
-################################################3
-####  Creacion de dataframes por casa
-
-house_dataframes <- list()
-
-##  Creacion listas con dataframes por Casas
-for (i in seq_len(nrow(db_event))) {
-  if (is.na(db_event$RelativePath[i])) {
-    # Extraer el dato de numero de casa
-    house_number <- extract_house_number(db_event$RootFolder[i])
-  } else {
-    # Si no es NA, extraer el dato de numero de casa de RelativePath
-    house_number <- extract_house_number(db_event$RelativePath[i])
-  }
-  
-  house_name <- paste("Casa", house_number, sep = "")
-  
-  #Agregar dato a columna casa
-  db_event$Casa[i] <- house_name
-  
-  ### crea el dataframe correspondiente a la casa solo con las columnas necesarias
-  selected_columns <- db_event[i, c("Evento_total", "Evento_casa", "Casa", "File", "DateTime", "Temperatura", "Especie1", "Numero_Especies1", "Cavidad_occupancy", "Especie2", "Numero_Especies2", "Especie3", "Interaccion" )] #Modificar aqui las columnas necesarias
-  #agrega columnas nuevas: evento total, evento casa, casa
-    
-  if (is.data.frame(house_dataframes[[house_name]])) {
-    # Si ya existe, agregar las columnas seleccionadas usando rbind()
-    house_dataframes[[house_name]] <- rbind(house_dataframes[[house_name]], selected_columns)
-  } else {
-    # Si no existe, simplemente asignar las columnas seleccionadas
-    house_dataframes[[house_name]] <- selected_columns
-  }
-}
-
-##  Extraccion de dataframe Casas ## opcional!!
-for (i in seq_along(house_dataframes)) {
-  # Obtener el nombre del dataframe
-  df_name <- names(house_dataframes)[i]
-  df_file <- house_dataframes[[i]]
-  assign(df_name, df_file)
-}
-
-### Calcular eventos independientes
-# Crea la lista y dataframes que contendran los eventos independientes
-df_eventos_ind <- data.frame()
-df_eventos_ind <- data.frame(matrix(ncol = ncol(house_dataframes[[1]]), nrow = 0))
-names(df_eventos_ind) <- names(house_dataframes[[1]])
-tiempo_anterior <- NA
-conteo_eventos <- 1
-conteo_eventos_casa <- 1
-
-# Calculo eventos independientes
-for (i in seq_along(house_dataframes)) {
-  house <- house_dataframes[[i]]
-  
-  tiempo_anterior <- NA
-  conteo_eventos_casa <- 1
-  
-  for (j in seq_len(nrow(house))) {
-    file <- house[j, ]
-    
-    #transformar formato tiempo y calcular diferencia de tiempo con valor anterior
-    fecha_hora <- file$DateTime
-    fecha_hora <- as.POSIXct(fecha_hora, format = "%d-%m-%Y %H:%M")
-    
-    if (!is.na(tiempo_anterior)) {
-      diferencia_tiempo <- difftime(fecha_hora, tiempo_anterior, units = "mins")
-      
-      if (diferencia_tiempo >= 30 | file$Especie1 != house$Especie1[j - 1]) {
-        df_eventos_ind <- rbind(df_eventos_ind, file)
-        df_eventos_ind$Evento_casa[conteo_eventos] <- conteo_eventos_casa
-        
-        #Conteo eventos casa
-        conteo_eventos_casa <- conteo_eventos_casa + 1
-        conteo_eventos <- conteo_eventos + 1
-      }
-    } else {
-      df_eventos_ind <- rbind(df_eventos_ind, file)
-      df_eventos_ind$Evento_casa[conteo_eventos] <- conteo_eventos_casa
-      
-      #conteo eventos casa
-      conteo_eventos_casa <- conteo_eventos_casa + 1
-      conteo_eventos <- conteo_eventos + 1
-    }
-
-    # Actualizar la fecha y hora anterior para la próxima iteración. Conteo evento casa
-    tiempo_anterior <- fecha_hora
-  }
-}
-
-#conteo eventos totales
-rownames(df_eventos_ind) <- NULL
-df_eventos_ind$Evento_total <- 1:nrow(df_eventos_ind)
-
-#extraer simbolos y letras de temperatura
-for (i in seq_len(nrow(df_eventos_ind))) {
-  temp_str <- df_eventos_ind$Temperatura[i]
-  df_eventos_ind$Temperatura[i] <- stri_extract_first_regex(temp_str, "^([0-9]+)")
-}
 
