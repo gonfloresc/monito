@@ -2,10 +2,11 @@
 library(readr)
 library(dplyr)
 library(stringi)
+library(lubridate)
 
 #  crea una lista de los .csv a importar
 ## !! modificar aqui la ruta donde se encuentran los archivos
-files <- list.files(path = "csv_revisiones/v2024_04_29/2023/", pattern = "*.csv", full.names = TRUE)
+files <- list.files(path = "csv_revisiones/v2024_05_14/2023/", pattern = "*.csv", full.names = TRUE)
 
 ### Eliminar columna $DeleteFlag y equipara el numero de columnas en archivos .csv
 
@@ -94,7 +95,6 @@ db_event <- data.frame()
 db_event <- csv_database
 ev_total <- seq_len(nrow(db_event))
 ev_casa <- seq_len(nrow(db_event))
-
 db_event <- cbind(Evento_total = ev_total, Evento_casa = ev_casa, Casa = csv_database$Casa, db_event)
 # Eliminar la última columna
 db_event <- subset(db_event, select = -ncol(db_event))
@@ -115,15 +115,22 @@ for (i in seq_len(nrow(db_event))) {
 
 ###
 ###   Filtrar db_event por periodo de tiempo. 
+db_event$DateTime <- ifelse(!is.na(as.POSIXct(as.integer(db_event$DateTime), origin = "1970-01-01")), 
+                            format(as.POSIXct(as.integer(db_event$DateTime), origin = "1970-01-01"), 
+                                   "%Y-%m-%d %H:%M:%S"), db_event$DateTime)
 db_event_flt_date <- db_event %>% 
-  mutate(DateTime = as.POSIXct(DateTime, format = "%Y-%m-%d %H:%M:%S")) %>% 
-  filter(DateTime >= as.POSIXct("2023-05-05") & DateTime <= as.POSIXct("2023-09-21")) ## Aqui establecer periodo
+  mutate(DateTime = as.POSIXct(DateTime, format = "%Y-%m-%d %H:%M")) %>% 
+  filter(DateTime >= as.POSIXct("2023-05-02") & DateTime <= as.POSIXct("2023-10-24")) ## Aqui establecer periodo
+
+# Export registros totales para tiempo de muestreo
+write.csv(db_event_flt_date, "Resultados/registros_totales_2023.csv", row.names = FALSE)
 
 
 ###   Filtrar evento unico x spp
 # Obtener todos los valores únicos de especie (y limpieza spp gato guiña a gato guina)
 especies_unicas <- unique(db_event_flt_date$Especie1)
-especies_unicas <- stri_replace_all_fixed(especies_unicas, "gato gui\xf1a", "gato guina")
+especies_unicas <- stri_replace_all_fixed(especies_unicas, "Gato gui\xf1a", "gato guina")
+especies_unicas <- stri_replace_all_fixed(especies_unicas, "Jabal\xf1", "jabali")
 
 # Crear una lista para almacenar los dataframes separados por especie
 lista_spp <- list()
@@ -145,8 +152,12 @@ ult_casa <- NA
 conteo_eventos <- 1
 conteo_eventos_casa <- 1
 
-## IMPORTANTE revisar lista_spp y eliminar manualmente dataframes vacios usar lista_spp[[indice_df_vacio]] <- NULL
-
+## IMPORTANTE revisar lista_spp y eliminar manualmente dataframes vacios 
+# o con problemas de caracteres.. usar lista_spp[[indice_df_vacio]] <- NULL
+lista_spp[[4]] <- NULL
+lista_spp[[17]] <- NULL
+lista_spp[[17]] <- NULL
+lista_spp[[33]] <- NULL
 # Revisión evento independiente por spp
 for (i in seq_along(lista_spp)) {
   df <- lista_spp[[i]]
@@ -183,7 +194,7 @@ for (i in seq_along(lista_spp)) {
       # Calcular la diferencia de tiempo entre la fila 1 y evento
       diferencia_tiempo <- difftime(df$DateTime[j], evento, units = "mins")
       diferencia_tiempo <- as.numeric(diferencia_tiempo)
-      if (diferencia_tiempo >= 60) {        ###### <----Aqui establecer rango evento único (mins)
+      if (diferencia_tiempo >= 1440) {        ###### <----Aqui establecer rango evento único (mins)
         df_nuevo <- rbind(df_nuevo, df[j,])
         evento <- df$DateTime[j]
         ult_casa <- df$Casa[j]
@@ -202,7 +213,7 @@ for (i in seq_along(lista_spp)) {
   
   lista_spp_uni[[df_name]] <- df_nuevo
   ult_casa <- NA
-  write.csv(lista_spp_uni[[df_name]], file = paste0("Resultados/Eventos_unicos_spp/2023/", df_name, ".csv"), row.names = FALSE)
+  write.csv(lista_spp_uni[[df_name]], file = paste0("Resultados/Eventos_unicos_spp/2023_24h/", df_name, ".csv"), row.names = FALSE)
 }
 
 ### Creacion output.csv con resumen 
