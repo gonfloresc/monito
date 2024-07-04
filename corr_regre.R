@@ -5,8 +5,8 @@
 
 # import datos
 casas <- read.csv("Resultados/Casas_totales_2023.csv")
-eventos_monito <- read.csv("Resultados/Eventos_unicos_spp/2023_1h/Monito del monte.csv")
-eventos_ratus <- read.csv("Resultados/Eventos_unicos_spp/2023_1h//Rata negra.csv", sep = ",")
+eventos_monito <- read.delim("Resultados/Eventos_unicos_spp/2023_1h/Monito del monte.csv", sep = ";")
+eventos_ratus <- read.csv("Resultados/Eventos_unicos_spp/2023_1h/Rata negra_1h.csv", sep = ";")
 atributos_veg <- read.csv("Resultados/Regresión Logística/Datos terreno 2023 - Covariables_CSV.csv")
 
 colnames(casas)[colnames(casas) == "x"] <- "Casa"
