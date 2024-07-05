@@ -1,5 +1,5 @@
 # install.packages("readr") ## ya instalado
-library(readr)
+library(readr) 
 library(dplyr)
 library(stringi)
 library(lubridate)
@@ -52,6 +52,7 @@ eliminar_deleteflag <- function(file_path) {
   }
   write_csv(datos, file_path)
 }
+
 
 # Aplicar la función a cada archivo CSV en la lista
 lapply(files, eliminar_deleteflag)
@@ -120,17 +121,17 @@ db_event$DateTime <- ifelse(!is.na(as.POSIXct(as.integer(db_event$DateTime), ori
                                    "%Y-%m-%d %H:%M:%S"), db_event$DateTime)
 db_event_flt_date <- db_event %>% 
   mutate(DateTime = as.POSIXct(DateTime, format = "%Y-%m-%d %H:%M")) %>% 
-  filter(DateTime >= as.POSIXct("2023-05-02") & DateTime <= as.POSIXct("2023-10-24")) ## Aqui establecer periodo
+  filter(DateTime >= as.POSIXct("2023-08-01") & DateTime <= as.POSIXct("2023-10-24")) ## Aqui establecer periodo
 
 # Export registros totales para tiempo de muestreo
-write.csv(db_event_flt_date, "Resultados/registros_totales_2023.csv", row.names = FALSE)
+write.csv(db_event_flt_date, "Resultados/Periodos/Agosto-Septiembre-Octubre/registros_p2_2023.csv", row.names = FALSE)
 
 
 ###   Filtrar evento unico x spp
 # Obtener todos los valores únicos de especie (y limpieza spp gato guiña a gato guina)
 especies_unicas <- unique(db_event_flt_date$Especie1)
-especies_unicas <- stri_replace_all_fixed(especies_unicas, "Gato gui\xf1a", "gato guina")
-especies_unicas <- stri_replace_all_fixed(especies_unicas, "Jabal\xf1", "jabali")
+especies_unicas <- stri_replace_all_fixed(especies_unicas, "gato gui\xf1a", "gato guina")
+especies_unicas <- stri_replace_all_fixed(especies_unicas, "Jabal\xed", "jabali")
 
 # Crear una lista para almacenar los dataframes separados por especie
 lista_spp <- list()
@@ -143,6 +144,8 @@ for (especie in especies_unicas) {
   lista_spp[[especie]] <- df_spp
 }
 
+#Elimina df NA
+#lista_spp[[1]] <- NULL
 
 lista_spp_uni <- list()
 evento <- numeric()
@@ -150,15 +153,10 @@ df <- data.frame()
 df_nuevo <- data.frame()
 ult_casa <- NA
 conteo_eventos <- 1
+
 conteo_eventos_casa <- 1
 
-## IMPORTANTE revisar lista_spp y eliminar manualmente dataframes vacios 
-# o con problemas de caracteres.. usar lista_spp[[indice_df_vacio]] <- NULL
-lista_spp[[4]] <- NULL
-lista_spp[[17]] <- NULL
-lista_spp[[17]] <- NULL
-lista_spp[[33]] <- NULL
-# Revisión evento independiente por spp
+### Revisión evento independiente por spp. Importante verificar .csv de salida y rango de tiempo evento unico!!
 for (i in seq_along(lista_spp)) {
   df <- lista_spp[[i]]
   casas_unicas <- unique(df$Casa)
@@ -207,14 +205,18 @@ for (i in seq_along(lista_spp)) {
     conteo_eventos_casa <- 1
     
   }
-  df_nuevo$Evento_total <- 1:nrow(df_nuevo)
+  if (nrow(df_nuevo != 0)) {
+    df_nuevo$Evento_total <- 1:nrow(df_nuevo)
+  }
   conteo_eventos <- 1
   conteo_eventos_casa <- 1
   
   lista_spp_uni[[df_name]] <- df_nuevo
   ult_casa <- NA
-  write.csv(lista_spp_uni[[df_name]], file = paste0("Resultados/Eventos_unicos_spp/2023_24h/", df_name, ".csv"), row.names = FALSE)
+  
+  ### .csv de salida
+  write.csv(lista_spp_uni[[df_name]], file = paste0("Resultados/Periodos/Agosto-Septiembre-Octubre/Eventos_unicos_spp/2023_p2_24h/", df_name, ".csv"), row.names = FALSE)
 }
 
-### Creacion output.csv con resumen 
+
 
