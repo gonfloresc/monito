@@ -7,6 +7,8 @@ library(ggplot2)
 data_mon <- read.csv("Resultados/Eventos_unicos_spp/2023_12h/Monito del monte_12h.csv")
 data_rat <- read.csv("Resultados/Eventos_unicos_spp/2023_12h/Rata negra_12h.csv")
 data_noches <- read.csv("Resultados/Resultado_noches_trampa.csv", sep = ";")
+tasa_monito <- read.csv("Resultados/Tasa Captura/cr_monito_24h.csv")
+tasa_rata <- read.csv("Resultados/Tasa Captura/cr_rata_24h.csv")
 
 # Convertir la columna de fecha_hora a formato POSIXct si no lo está ya
 data_mon$DateTime <- as.POSIXct(data_mon$DateTime, format="%Y-%m-%d %H:%M:%S")
@@ -33,6 +35,21 @@ data_rat <- data_rat %>%
     Casa >= 41 & Casa <= 120 ~ "KOD",
     Casa >= 121 & Casa <= 159 ~ "LLA"
   ))
+
+tasa_monito <- tasa_monito %>% 
+  mutate(sitio = case_when(
+    casa >= 0 & casa <= 40 ~ "KAW",
+    casa >= 41 & casa <= 120 ~ "KOD",
+    casa >= 121 & casa <= 159 ~ "LLA"
+  ))
+
+tasa_rata <- tasa_rata %>% 
+  mutate(sitio = case_when(
+    casa >= 0 & casa <= 40 ~ "KAW",
+    casa >= 41 & casa <= 120 ~ "KOD",
+    casa >= 121 & casa <= 159 ~ "LLA"
+  ))
+
 # Asegurarse de que Casa sea un factor
 data_mon$Casa <- as.factor(data_mon$Casa)
 data_rat$Casa <- as.factor(data_rat$Casa)
@@ -102,7 +119,7 @@ df_full_rat$cr <- (df_full_rat$Eventos / 30) * 100
 
 
 
-# Crear el gráfico
+# Crear el gráfico eventos por mes/casa
 ggplot(df_full_rat, aes(x = mes, y = cr, color = sitio)) +
   geom_point(position = position_jitter(width = 8, height = 0), size = 2.5) +
   scale_color_manual(values = c("KOD" = "#F4D03F", "LLA" = "#76D7C4", "KAW" = "#F1948A")) +
@@ -110,4 +127,17 @@ ggplot(df_full_rat, aes(x = mes, y = cr, color = sitio)) +
   scale_x_date(date_labels = "%B") + 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
+# Crear el gráfico promedio tasa de capturas por sitio
+# Combinamos los dos data frames en uno solo
+tasa_monito$especie <- "Monito"
+tasa_rata$especie <- "Rata"
 
+tasa_total <- rbind(tasa_monito, tasa_rata)
+
+tasa_promedio <- aggregate(cr_100 ~ sitio + especie, data = tasa_total, FUN = mean)
+
+# Creamos el gráfico de barras
+ggplot(tasa_promedio, aes(x = sitio, y = cr_100, fill = especie)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), width = 0.5) +
+  labs(x = "Sitio de estudio", y = "Tasa de captura", fill = "Especie") +
+  theme_minimal()
